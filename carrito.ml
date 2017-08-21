@@ -24,7 +24,7 @@ let print_map map =
   
 let cart_client ep =
   let ep = Session.select (fun x -> `TryAdd x) ep in
-  let ep = Session.send "p1" ep in
+  let ep = Session.send "p2" ep in
   let ep = Session.send 1 ep in
   let result, ep = Session.receive ep in
   let _ = print_endline result in
@@ -38,6 +38,10 @@ let cart_client ep =
   let ep = Session.select (fun x -> `Content x) ep in
   let result, ep = Session.receive ep in
   let _ = print_map result in
+
+  let ep = Session.select (fun x -> `Total x) ep in
+  let result, ep = Session.receive ep in
+  let _ = print_endline (string_of_int result) in
 
   let ep = Session.select (fun x -> `End x) ep in
   Session.close ep;
@@ -67,6 +71,13 @@ let find_or_default dic key default =
   else
     "Unknown product"
 
+let sum_cart catalog =
+  StringMap.fold (fun code quantity total -> 
+                    let price = StringMap.find code catalog in
+                    total + (price * quantity)
+                  ) !cart 0
+
+
 let rec cart_service ep =
   match Session.branch ep with
   | `TryAdd ep -> let code, ep = Session.receive ep in
@@ -76,8 +87,11 @@ let rec cart_service ep =
                   cart_service ep
   | `Content ep -> let ep = Session.send !cart ep in
                   cart_service ep
+  | `Total ep -> let total = sum_cart catalog in
+                 let ep = Session.send total ep in
+                 cart_service ep
   | `End ep -> Session.close ep
-  (*  `total ep ->
+  (*  
   | `remove ep ->
   | `leave ep ->
   | `checkout ep ->   *)
