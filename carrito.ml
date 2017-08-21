@@ -18,21 +18,30 @@ let inventory = StringMap.add "p3" 1 inventory
 let cart : int StringMap.t ref = ref StringMap.empty
 
 
+let print_map map =
+  StringMap.iter (fun k v -> print_endline (String.concat "" ["("; k; ", "; string_of_int v; ")"])) map
+  
+  
 let cart_client ep =
   let ep = Session.select (fun x -> `TryAdd x) ep in
   let ep = Session.send "p1" ep in
   let ep = Session.send 1 ep in
-  let result1, ep = Session.receive ep in
-  let _ = print_endline result1 in
+  let result, ep = Session.receive ep in
+  let _ = print_endline result in
 
   let ep = Session.select (fun x -> `TryAdd x) ep in
   let ep = Session.send "p4" ep in
   let ep = Session.send 1 ep in
-  let result2, ep = Session.receive ep in
-  
+  let result, ep = Session.receive ep in
+  let _ = print_endline result in
+
+  let ep = Session.select (fun x -> `Content x) ep in
+  let result, ep = Session.receive ep in
+  let _ = print_map result in
+
   let ep = Session.select (fun x -> `End x) ep in
   Session.close ep;
-  result2
+  "Finished"
 
 let add_to_cart code quantity =
   cart := StringMap.add code quantity !cart;
@@ -65,9 +74,10 @@ let rec cart_service ep =
                   let result = try_add_products inventory code quantity in 
                   let ep = Session.send result ep in
                   cart_service ep
+  | `Content ep -> let ep = Session.send !cart ep in
+                  cart_service ep
   | `End ep -> Session.close ep
-  (* | `content ep ->
-  | `total ep ->
+  (*  `total ep ->
   | `remove ep ->
   | `leave ep ->
   | `checkout ep ->   *)
