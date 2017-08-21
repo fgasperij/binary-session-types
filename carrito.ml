@@ -20,25 +20,41 @@ let cart : int StringMap.t ref = ref StringMap.empty
 
 let cart_client ep =
   let ep = Session.select (fun x -> `TryAdd x) ep in
-  let ep = Session.send "p32" ep in
+  let ep = Session.send "p1" ep in
   let ep = Session.send 1 ep in
-  let result, ep = Session.receive ep in
+  let result1, ep = Session.receive ep in
+  let _ = print_endline result1 in
+
+  let ep = Session.select (fun x -> `TryAdd x) ep in
+  let ep = Session.send "p4" ep in
+  let ep = Session.send 1 ep in
+  let result2, ep = Session.receive ep in
+  
   let ep = Session.select (fun x -> `End x) ep in
   Session.close ep;
-  result
+  result2
+
+let add_to_cart code quantity =
+  cart := StringMap.add code quantity !cart;
+  "OK"
+
+let find_or_default dic key default =
+  if StringMap.mem key dic
+  then
+    StringMap.find key dic
+  else
+    default
 
  let try_add_products inventory code quantity =
   if StringMap.mem code inventory
   then
-    "Known product"
-    (* let cart_units = StringMap.find code !cart in
+    let cart_units = find_or_default !cart code 0 in
     let stock_units = StringMap.find code inventory in
       if  cart_units + quantity > stock_units
       then
         "Not enough stock"
       else
-        cart := StringMap.add code (cart_units + quantity) !cart;
-        "OK" *)
+        add_to_cart code (cart_units + quantity)
   else
     "Unknown product"
 
