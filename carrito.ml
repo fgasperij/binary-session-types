@@ -15,28 +15,40 @@ let inventory = StringMap.add "p2" 1 inventory
 let inventory = StringMap.add "p3" 1 inventory
 
 (* (productCode, addedUnits) *)
-let cart = StringMap.empty
+let cart : int StringMap.t ref = ref StringMap.empty
 
 
 let cart_client ep =
   let ep = Session.select (fun x -> `TryAdd x) ep in
-  let ep = Session.send "p1" ep in
+  let ep = Session.send "p32" ep in
   let ep = Session.send 1 ep in
   let result, ep = Session.receive ep in
   let ep = Session.select (fun x -> `End x) ep in
   Session.close ep;
   result
 
-(* let try_add_products inventory cart code quantity = Ok ()  *)
+ let try_add_products inventory code quantity =
+  if StringMap.mem code inventory
+  then
+    "Known product"
+    (* let cart_units = StringMap.find code !cart in
+    let stock_units = StringMap.find code inventory in
+      if  cart_units + quantity > stock_units
+      then
+        "Not enough stock"
+      else
+        cart := StringMap.add code (cart_units + quantity) !cart;
+        "OK" *)
+  else
+    "Unknown product"
 
-let rec cart_service (ep, catalog, inventory) =
+let rec cart_service ep =
   match Session.branch ep with
   | `TryAdd ep -> let code, ep = Session.receive ep in
                   let quantity, ep = Session.receive ep in
-                  let result = "OK" in
-                  (* let result = try_add_products inventory cart code quantity in *)
+                  let result = try_add_products inventory code quantity in 
                   let ep = Session.send result ep in
-                  cart_service (ep, catalog, inventory)
+                  cart_service ep
   | `End ep -> Session.close ep
   (* | `content ep ->
   | `total ep ->
@@ -46,5 +58,5 @@ let rec cart_service (ep, catalog, inventory) =
 
 let _ =
   let a, b = Session.create () in
-  let _ = Thread.create cart_service (a, catalog, inventory) in  
+  let _ = Thread.create cart_service a in
   print_endline (cart_client b)
