@@ -29,8 +29,17 @@ let cart_client ep =
   let result, ep = Session.receive ep in
   let _ = print_endline result in
 
+  let ep = Session.select (fun x -> `Content x) ep in
+  let result, ep = Session.receive ep in
+  let _ = print_map result in
+
+  let ep = Session.select (fun x -> `Total x) ep in
+  let result, ep = Session.receive ep in
+  let _ = print_endline (string_of_int result) in
+
+
   let ep = Session.select (fun x -> `TryAdd x) ep in
-  let ep = Session.send "p4" ep in
+  let ep = Session.send "p1" ep in
   let ep = Session.send 1 ep in
   let result, ep = Session.receive ep in
   let _ = print_endline result in
@@ -42,6 +51,22 @@ let cart_client ep =
   let ep = Session.select (fun x -> `Total x) ep in
   let result, ep = Session.receive ep in
   let _ = print_endline (string_of_int result) in
+
+
+  let ep = Session.select (fun x -> `TryRemove x) ep in
+  let ep = Session.send "p1" ep in
+  let ep = Session.send 1 ep in
+  let result, ep = Session.receive ep in
+  let _ = print_endline result in
+
+  let ep = Session.select (fun x -> `Content x) ep in
+  let result, ep = Session.receive ep in
+  let _ = print_map result in
+
+  let ep = Session.select (fun x -> `Total x) ep in
+  let result, ep = Session.receive ep in
+  let _ = print_endline (string_of_int result) in
+
 
   let ep = Session.select (fun x -> `End x) ep in
   Session.close ep;
@@ -77,6 +102,22 @@ let sum_cart catalog =
                     total + (price * quantity)
                   ) !cart 0
 
+let remove_from_cart code quantity cart_units =
+  cart := StringMap.add code (cart_units - quantity) !cart;
+  "OK"
+                
+let try_remove_products code quantity =
+  if StringMap.mem code !cart
+  then
+    let cart_units = StringMap.find code !cart in
+    if cart_units >= quantity
+    then
+      remove_from_cart code quantity cart_units
+    else
+      "You are trying to remove units that aren't there!"
+  else
+    "That product is not present in your cart"
+
 
 let rec cart_service ep =
   match Session.branch ep with
@@ -90,9 +131,13 @@ let rec cart_service ep =
   | `Total ep -> let total = sum_cart catalog in
                  let ep = Session.send total ep in
                  cart_service ep
+  | `TryRemove ep -> let code, ep = Session.receive ep in
+                     let quantity, ep = Session.receive ep in
+                     let result = try_remove_products code quantity in 
+                     let ep = Session.send result ep in
+                     cart_service ep
   | `End ep -> Session.close ep
   (*  
-  | `remove ep ->
   | `leave ep ->
   | `checkout ep ->   *)
 
