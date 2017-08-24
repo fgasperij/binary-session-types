@@ -40,4 +40,13 @@ Error: This expression has type
        Types for tag `Checkout are incompatible
 ```
 
-2.
+2. La función `cart_client_add_products_after_pay` muestra un ejemplo en el cual se intenta pagar y luego se intenta agregar un producto. Nada impide
+ese flujo ya que luego de intentar pagar se vuelve recursivamente al endpoint original.
+
+3. La función `leave_store_empty_cart` muestra un ejemplo en el que la única acción que realiza el cliente es abandonar la compra.
+
+4. La función `remove_non_present` muestra un ejemplo. Se puede intentar quitar productos que no están en el carrito pero esto
+no tendrá efecto alguno sobre el contenido del carrito. La única diferencia con el caso en el cual el producto está presente con
+una cantidad mayor o igual a la que se intenta quitar es que en el exitoso la respuesta es "OK" y en el otro es 
+"You are trying to remove units that aren't there!" en el caso de que no hay tantas unidades en el carrito y "That product is not present in your cart"
+si el carrito no contiene ninguna unidad de ese  producto.

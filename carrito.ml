@@ -17,7 +17,7 @@ let inventory = StringMap.add "p3" 1 inventory
 (* (productCode, addedUnits) *)
 let cart : int StringMap.t ref = ref StringMap.empty
 
-
+(** cart client **)
 let print_map map =
   StringMap.iter (fun k v -> print_endline (String.concat "" ["("; k; ", "; string_of_int v; ")"])) map
 
@@ -34,42 +34,50 @@ let rec try_to_pay_until_ok ep n =
       else
         try_to_pay_until_ok ep (n - 1)
 
-(* TEST *)
-let cart_client ep =
+let client_try_add_product ep code quantity =
   let ep = Session.select (fun x -> `TryAdd x) ep in
-  let ep = Session.send "p2" ep in
-  let ep = Session.send 1 ep in
+  let ep = Session.send code ep in
+  let ep = Session.send quantity ep in
   let result, ep = Session.receive ep in
   let _ = print_endline result in
+    ep
 
-  let ep = Session.select (fun x -> `Content x) ep in
-  let result, ep = Session.receive ep in
-  let _ = print_map result in
-
-  let ep = Session.select (fun x -> `Total x) ep in
-  let result, ep = Session.receive ep in
-  let _ = print_endline (string_of_int result) in
-
-
-  let ep = Session.select (fun x -> `TryAdd x) ep in
-  let ep = Session.send "p1" ep in
-  let ep = Session.send 1 ep in
-  let result, ep = Session.receive ep in
-  let _ = print_endline result in
-
-  let ep = Session.select (fun x -> `Content x) ep in
-  let result, ep = Session.receive ep in
-  let _ = print_map result in
-
-  let ep = Session.select (fun x -> `Total x) ep in
-  let result, ep = Session.receive ep in
-  let _ = print_endline (string_of_int result) in
-
+let client_try_remove_product ep code quantity =
   let ep = Session.select (fun x -> `TryRemove x) ep in
-  let ep = Session.send "p1" ep in
-  let ep = Session.send 1 ep in
+  let ep = Session.send code ep in
+  let ep = Session.send quantity ep in
   let result, ep = Session.receive ep in
   let _ = print_endline result in
+    ep
+
+let leave_store ep = 
+  let ep = Session.select (fun x -> `Leave x) ep in
+  Session.close ep;
+  print_endline "Finished"
+
+(* test client used for development *)
+let cart_client ep =
+  let ep = client_try_add_product ep "p2" 1 in
+
+  let ep = Session.select (fun x -> `Content x) ep in
+  let result, ep = Session.receive ep in
+  let _ = print_map result in
+
+  let ep = Session.select (fun x -> `Total x) ep in
+  let result, ep = Session.receive ep in
+  let _ = print_endline (string_of_int result) in
+
+  let ep = client_try_add_product ep "p1" 1 in
+
+  let ep = Session.select (fun x -> `Content x) ep in
+  let result, ep = Session.receive ep in
+  let _ = print_map result in
+
+  let ep = Session.select (fun x -> `Total x) ep in
+  let result, ep = Session.receive ep in
+  let _ = print_endline (string_of_int result) in
+
+  let ep = client_try_remove_product ep "p1" 1 in
 
   let ep = Session.select (fun x -> `Content x) ep in
   let result, ep = Session.receive ep in
@@ -80,16 +88,31 @@ let cart_client ep =
   let _ = print_endline (string_of_int result) in
   
   let ep = try_to_pay_until_ok ep 40 in
+    leave_store ep
 
-  let ep = Session.select (fun x -> `Leave x) ep in
-  Session.close ep;
-  "Finished"
+
+
+(* ejemplos del punto 2 *)
 
 (* cerrar la sesión luego de enviar los datos de pago sin esperar la respuesta del carrito. *)
 (* let cart_client_close_session_suddenly ep =
   let ep = Session.select (fun x -> `Checkout x) ep in
   Session.close ep;
   "Finished" *)
+
+(* agregar productos al carrito luego de intentar un pago. *)
+let cart_client_add_products_after_pay ep =
+  let ep = try_to_pay_until_ok ep 1 in
+  let ep = client_try_add_product ep "p1" 1 in
+    leave_store ep
+    
+(* finalizar la compra cuando el carrito está vacío. *)
+let leave_store_empty_cart ep = leave_store ep
+
+(* intentar eliminar un producto que no ha sido agregado al carrito. *)
+let remove_non_present ep = client_try_remove_product ep "inexistent" 12
+
+(** cart service **)
 
 let add_to_cart code quantity =
   cart := StringMap.add code quantity !cart;
@@ -102,7 +125,7 @@ let find_or_default dic key default =
   else
     default
 
- let try_add_products inventory code quantity =
+let try_add_products inventory code quantity =
   if StringMap.mem code inventory
   then
     let cart_units = find_or_default !cart code 0 in
@@ -163,7 +186,9 @@ let rec cart_service ep =
   | `Leave ep -> cart := StringMap.empty; Session.close ep
 
 
+
+(* main *)
 let _ =
   let a, b = Session.create () in
   let _ = Thread.create cart_service a in
-  print_endline (cart_client_close_session_suddenly b)
+  remove_non_present b
