@@ -185,10 +185,40 @@ let rec cart_service ep =
                     cart_service ep
   | `Leave ep -> cart := StringMap.empty; Session.close ep
 
-
+(* let rec cart_service_max_attempts ep n =
+  match Session.branch ep with
+  | `TryAdd ep -> let code, ep = Session.receive ep in
+                  let quantity, ep = Session.receive ep in
+                  let result = try_add_products inventory code quantity in 
+                  let ep = Session.send result ep in
+                  cart_service_max_attempts ep n
+  | `Content ep -> let ep = Session.send !cart ep in
+                   cart_service_max_attempts ep n
+  | `Total ep -> let total = sum_cart catalog in
+                  let ep = Session.send total ep in
+                  cart_service_max_attempts ep n
+  | `TryRemove ep -> let code, ep = Session.receive ep in
+                     let quantity, ep = Session.receive ep in
+                     let result = try_remove_products code quantity in 
+                     let ep = Session.send result ep in
+                     cart_service_max_attempts ep n
+  | `Checkout ep -> if n == 0
+                    then
+                      let _ = cart := StringMap.empty in
+                      let ep = Session.send "FAIL" ep in
+                      Session.close ep
+                    else
+                      let random_number = Random.int(100) in
+                      let successful_payment = random_number > 90 in
+                      let response = if successful_payment then "OK" else "FAIL" in
+                      let next_n = if successful_payment then n else (n - 1) in
+                      let ep = Session.send response ep in
+                      cart_service_max_attempts ep next_n
+  | `Leave ep -> cart := StringMap.empty; Session.close ep *)
+  
 
 (* main *)
 let _ =
   let a, b = Session.create () in
   let _ = Thread.create cart_service a in
-  remove_non_present b
+  cart_client b
